@@ -1,0 +1,32 @@
+node
+{
+    def buildNumber = BUILD_NUMBER
+    stage('git clone')
+    {
+        git url:"https://github.com/balaji-sc-mss/java-web-app-docker.git"
+    }
+    stage('maven clean pckage')
+    {
+       def mavenHome = tool name: "maven"
+       sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage('build docker package')
+    {
+        sh "docker build -t balaji84999/java-web-app-docker:${buildNumber} ."
+    }
+    stage('docker login and push')
+    {
+        withCredentials([string(credentialsId: 'dockerhubpwd', variable: 'dockerhubpwd')]) {  
+            
+        sh "docker login -u balaji84999 -p ${dockerhubpwd}"
+        }
+        sh "docker push balaji84999/java-web-app-docker:${buildNumber}"
+     }
+     stage('deploy application as docker container in docker deployment server')
+     {
+         sshagent(['dockerdevserverssh']) {
+             sh "ssh -o StrictHostKeyChecking=no ubuntu@13.233.206.51 docker rm -f javawebappcontainer || true"
+             sh "ssh -o StrictHostKeyChecking=no ubuntu@13.233.206.51 docker run -d -p 9090:8080 --name javawebappcontainer balaji84999/java-web-app-docker:${buildNumber}"
+     }
+   }
+}
